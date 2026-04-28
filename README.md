@@ -34,7 +34,7 @@ Ce projet déploie une infrastructure cloud AWS complète en deux étapes :
 
 ## Architecture globale
 
-\`\`\`
+```
 Réseau Local (Debian)
     │
     │ VPN OpenVPN (Pritunl)
@@ -55,7 +55,7 @@ Internet
     ├── RDS MySQL 8.0 Multi-AZ
     ├── S3 Bucket + Lambda Python
     └── CloudWatch (monitoring CPU)
-\`\`\`
+```
 
 ---
 
@@ -65,18 +65,18 @@ Internet
 
 #### 1. AWS CLI
 Télécharger : https://aws.amazon.com/fr/cli/
-\`\`\`bash
+```bash
 aws --version
-\`\`\`
+```
 
 #### 2. Terraform (>= 1.5)
 Télécharger : https://developer.hashicorp.com/terraform/downloads
-\`\`\`bash
+```bash
 terraform version
-\`\`\`
+```
 
 #### 3. Configurer AWS CLI
-\`\`\`bash
+```bash
 aws configure
 # AWS Access Key ID     : votre_access_key
 # AWS Secret Access Key : votre_secret_key
@@ -85,21 +85,21 @@ aws configure
 
 # Vérifier :
 aws sts get-caller-identity
-\`\`\`
+```
 
 #### 4. Docker et Docker Compose (pour TP2)
 Télécharger : https://www.docker.com/products/docker-desktop/
-\`\`\`bash
+```bash
 docker --version
 docker compose version
-\`\`\`
+```
 
 #### 5. Client OpenVPN (pour TP2)
 - **Windows/Mac** : https://openvpn.net/client/
 - **Linux/Debian** :
-\`\`\`bash
+```bash
 sudo apt install openvpn -y
-\`\`\`
+```
 
 ---
 
@@ -118,7 +118,7 @@ sudo apt install openvpn -y
 
 ### Structure des fichiers Terraform
 
-\`\`\`
+```
 tp1/
 ├── main.tf           # VPC, subnets, NAT Gateways, routes
 ├── ec2_asg.tf        # Launch Template, ALB, ASG, CloudWatch
@@ -128,16 +128,16 @@ tp1/
 ├── variables.tf      # Variables configurables
 ├── versions.tf       # Providers Terraform
 └── outputs.tf        # Valeurs exportées après déploiement
-\`\`\`
+```
 
 ### Déploiement
 
-\`\`\`bash
+```bash
 cd tp1
 
 # Définir le mot de passe RDS
 # Windows PowerShell :
-\$env:TF_VAR_db_password = "VotreMotDePasseSecurise123!"
+$env:TF_VAR_db_password = "VotreMotDePasseSecurise123!"
 # Linux/Mac :
 export TF_VAR_db_password="VotreMotDePasseSecurise123!"
 
@@ -145,45 +145,48 @@ terraform init
 terraform plan
 terraform apply -auto-approve
 # Durée : environ 15-20 minutes (RDS Multi-AZ)
-\`\`\`
+```
 
 ### Résultats attendus
 
-\`\`\`
+```
 alb_dns_name         = "keyce-tp2-alb-XXXXXXX.us-east-1.elb.amazonaws.com"
 pritunl_ui_url       = "https://keyce-tp2-alb-XXXXXXX.us-east-1.elb.amazonaws.com"
 s3_bucket_name       = "keyce-tp2-storage-XXXXXXXXXXXX"
 lambda_function_name = "keyce-tp2-log-processor"
 asg_name             = "keyce-tp2-asg"
-\`\`\`
+```
 
 ### Configuration initiale de Pritunl
 
 #### 1. Récupérer la clé de setup
-\`\`\`bash
+```bash
+# Lister les instances de l'ASG
 aws autoscaling describe-auto-scaling-groups \
     --auto-scaling-group-names keyce-tp2-asg \
     --query "AutoScalingGroups[0].Instances[*].InstanceId" \
     --output text
 
+# Se connecter via SSM (sans clé SSH)
 aws ssm start-session --target <INSTANCE_ID>
 
+# Dans la session SSM :
 cat /root/pritunl-setup-key.txt
-\`\`\`
+```
 
 #### 2. Accéder à Pritunl
-Ouvrir : \`https://<IP_PUBLIQUE_INSTANCE>\`
+Ouvrir : `https://<IP_PUBLIQUE_INSTANCE>`
 (Accepter l'avertissement SSL — certificat auto-signé)
 
 #### 3. Configurer le serveur VPN
 1. Entrer la **setup-key**
-2. MongoDB URI par défaut : \`mongodb://localhost:27017/pritunl\`
+2. MongoDB URI par défaut : `mongodb://localhost:27017/pritunl`
 3. Changer le mot de passe admin
 4. **Users** → Add Organization → Add User
 5. **Servers** → Add Server :
-   - Port : \`1194\`, Protocol : \`udp\`, WireGuard : **décoché**
+   - Port : `1194`, Protocol : `udp`, WireGuard : **décoché**
 6. Attach Organization → Start Server
-7. Télécharger le fichier \`.ovpn\`
+7. Télécharger le fichier `.ovpn`
 
 ---
 
@@ -200,34 +203,51 @@ Utiliser l'infrastructure VPN du TP1 pour créer un environnement hybride et dé
 
 ### Structure des fichiers
 
-\`\`\`
+```
 odoo-ha/
 └── docker-compose.yml    # Définition des conteneurs Odoo + PostgreSQL
-\`\`\`
+```
 
 ### Étape 1 — Connexion VPN (Hybridation)
 
-\`\`\`bash
+```bash
+# Linux/Debian :
 sudo openvpn --config votre-profil.ovpn --daemon
+
+# Vérifier la connexion VPN
 ip addr show tun0
 curl ifconfig.me
-\`\`\`
+# Doit afficher l'IP publique AWS
+```
 
 ### Étape 2 — Déploiement Odoo sur Instance 1 (Nœud Maître)
 
-\`\`\`bash
+```bash
+# Se connecter à l'instance via SSH (grâce au VPN)
 ssh -i keyce-tp2-key.pem ec2-user@<IP_PRIVEE_INSTANCE_1>
+
 mkdir -p ~/odoo-ha && cd ~/odoo-ha
+```
+
+Copier le fichier `odoo-ha/docker-compose.yml` de ce dépôt sur l'instance, puis :
+
+```bash
 docker-compose up -d
 docker-compose ps
-\`\`\`
+```
 
-Accéder à Odoo : \`http://<IP_PUBLIQUE_1>:8069\`
+Accéder à Odoo : `http://<IP_PUBLIQUE_1>:8069`
+
+Créer la base de données :
+- Database Name : `keyce-odoo`
+- Language : Français
 
 ### Étape 3 — Déploiement Odoo sur Instance 2 (Nœud Esclave)
 
-\`\`\`bash
-cat > ~/odoo-ha/docker-compose.yml <<'DOCKEREOF'
+Sur l'instance 2, modifier le `docker-compose.yml` pour pointer vers le PostgreSQL de l'instance 1 :
+
+```bash
+cat > ~/odoo-ha/docker-compose.yml <<'EOF'
 services:
   odoo:
     image: odoo:17
@@ -244,32 +264,49 @@ services:
 
 volumes:
   odoo-web-data:
-DOCKEREOF
+EOF
 
 docker-compose up -d
-\`\`\`
+```
 
 ### Étape 4 — Synchronisation du Filestore
 
-\`\`\`bash
+```bash
+# Sur Instance 1 — exporter le filestore
 docker cp odoo-app:/var/lib/odoo/filestore /tmp/odoo-filestore
+
+# Uploader vers S3
 aws s3 cp /tmp/odoo-filestore s3://<BUCKET_NAME>/odoo-filestore/ --recursive
+
+# Sur Instance 2 — télécharger depuis S3
 aws s3 cp s3://<BUCKET_NAME>/odoo-filestore/ /tmp/odoo-filestore/ --recursive
 docker cp /tmp/odoo-filestore odoo-app:/var/lib/odoo/filestore/keyce-odoo
 docker restart odoo-app
-\`\`\`
+```
 
 ---
 
 ## Test de résilience
 
+### Objectif
+Vérifier que si un nœud Odoo tombe, l'autre continue de servir l'application avec les mêmes données.
+
 ### Procédure
 
-\`\`\`bash
+```bash
+# 1. Créer des données de test dans Odoo
+#    Contacts → Nouveau → Créer un contact
+
+# 2. Arrêter Odoo sur l'instance 1
 ssh -i keyce-tp2-key.pem ec2-user@<IP_INSTANCE_1> "docker stop odoo-app"
+
+# 3. Vérifier que l'instance 2 répond toujours
 curl http://<IP_INSTANCE_2>:8069
+# Ouvrir dans le navigateur et vérifier que les données sont présentes
+
+# 4. Redémarrer l'instance 1
 ssh -i keyce-tp2-key.pem ec2-user@<IP_INSTANCE_1> "docker start odoo-app"
-\`\`\`
+```
 
 ### Résultat attendu
 ✅ Les données sont accessibles sur l'instance 2 même quand l'instance 1 est arrêtée.
@@ -278,50 +315,56 @@ ssh -i keyce-tp2-key.pem ec2-user@<IP_INSTANCE_1> "docker start odoo-app"
 
 ## Nettoyage des ressources
 
-> ⚠️ Les NAT Gateways coûtent ~\$3/jour. Détruire après la démo !
+> ⚠️ Les NAT Gateways coûtent ~$3/jour. Détruire après la démo !
 
-\`\`\`bash
+```bash
+# Vider le bucket S3 d'abord
 aws s3 rm s3://<NOM_BUCKET> --recursive
+
+# Détruire l'infrastructure TP1
 cd tp1
 export TF_VAR_db_password="VotreMotDePasse"
 terraform destroy -auto-approve
-\`\`\`
+```
+
+> Les AMIs et snapshots ne sont pas supprimés automatiquement.
+> Les supprimer manuellement : Console AWS → EC2 → AMIs et Snapshots.
 
 ---
 
 ## Dépannage
 
 ### Terraform init échoue
-\`\`\`bash
+```bash
 rm -rf .terraform && terraform init
-\`\`\`
+```
 
 ### Erreur AccessDenied AWS
-\`\`\`bash
+```bash
 aws iam list-attached-user-policies --user-name <USER>
-\`\`\`
+```
 
 ### VPN connecté mais pas d'accès aux instances
-\`\`\`bash
+```bash
 ip addr show tun0
 ping <IP_PRIVEE_INSTANCE>
-\`\`\`
+```
 
 ### Pritunl ne démarre pas
-\`\`\`bash
+```bash
 sudo tail -50 /var/log/pritunl-install.log
 sudo systemctl status pritunl mongod
-\`\`\`
+```
 
 ### Odoo page blanche après connexion
-\`\`\`bash
+```bash
 docker exec odoo-app odoo -d keyce-odoo \
     --db_host=<IP_POSTGRES> \
     --db_user=odoo \
     --db_password=odoo_password \
     --update=web --stop-after-init
 docker restart odoo-app
-\`\`\`
+```
 
 ---
 
